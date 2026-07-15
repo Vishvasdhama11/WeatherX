@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WeatherX Premium</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='28' fill='%234f8bff'/%3E%3Cpath d='M53 34l14 22 20 6-16 16 4 22-20-12-20 12 4-22-16-16 20-6 14-22z' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="aurora" aria-hidden="true">
+    <span class="aurora-blob b1"></span>
+    <span class="aurora-blob b2"></span>
+    <span class="aurora-blob b3"></span>
+</div>
+<div class="noise" aria-hidden="true"></div>
+<div id="rainOverlay" class="rain-overlay" aria-hidden="true"></div>
+
+<div id="statusToast" class="status-toast" role="status" aria-live="polite"></div>
+<div id="loadingOverlay" class="loading-overlay" aria-hidden="true">
+    <div class="spinner" aria-hidden="true"></div>
+    <p>Loading weather data…</p>
+</div>
+
+<div class="container">
+
+    <aside class="side-nav" aria-label="Main navigation">
+        <span class="nav-logo"><i class="fa-solid fa-cloud-bolt"></i></span>
+        <button class="nav-btn active" id="navDashboardBtn" title="Weather dashboard">
+            <i class="fa-solid fa-grip"></i>
+        </button>
+        <button class="nav-btn" id="navMapBtn" title="Jump to weather map">
+            <i class="fa-solid fa-map"></i>
+        </button>
+        <button class="nav-btn" id="navLocationBtn" title="Use my current location">
+            <i class="fa-solid fa-location-dot"></i>
+        </button>
+        <button class="nav-btn" id="navRadarBtn" title="Toggle live auto-refresh">
+            <i class="fa-solid fa-circle-notch"></i>
+        </button>
+        <button class="nav-btn" id="navCalendarBtn" title="Jump to forecast / toggle 5-7 days">
+            <i class="fa-solid fa-calendar-days"></i>
+        </button>
+        <button class="nav-btn" id="navSettingsBtn" title="Quick settings">
+            <i class="fa-solid fa-gear"></i>
+        </button>
+        <span class="nav-spacer"></span>
+        <button class="nav-btn" id="navAlertsBtn" title="Weather alerts">
+            <i class="fa-solid fa-bell"></i>
+            <span class="nav-badge" id="navAlertBadge" hidden></span>
+        </button>
+
+        <div class="settings-popover" id="settingsPopover" aria-hidden="true">
+            <p class="settings-title">Quick settings</p>
+            <button type="button" class="settings-row" id="settingsUnitBtn">
+                <span><i class="fa-solid fa-temperature-half"></i> Units</span>
+                <span class="settings-value" id="settingsUnitValue">°C</span>
+            </button>
+            <button type="button" class="settings-row" id="settingsThemeBtn">
+                <span><i class="fa-solid fa-circle-half-stroke"></i> Theme</span>
+                <span class="settings-value" id="settingsThemeValue">Dark</span>
+            </button>
+            <button type="button" class="settings-row" id="settingsRadarBtn">
+                <span><i class="fa-solid fa-circle-notch"></i> Auto-refresh</span>
+                <span class="settings-value" id="settingsRadarValue">Off</span>
+            </button>
+            <div class="settings-divider"></div>
+            <button type="button" class="settings-row" id="settingsSaveFavoriteBtn">
+                <span><i class="fa-solid fa-star"></i> Save favorite</span>
+            </button>
+            <button type="button" class="settings-row" id="settingsClearFavoritesBtn">
+                <span><i class="fa-solid fa-trash"></i> Clear favorites</span>
+            </button>
+        </div>
+    </aside>
+
+    <div class="dash">
+
+        <header class="top-bar">
+            <div class="brand">
+                <span class="brand-mark"><i class="fa-solid fa-cloud-sun"></i></span>
+                <div>
+                    <p class="eyebrow">Live conditions &middot; anywhere on earth</p>
+                    <h1>Weather<span>X</span></h1>
+                </div>
+            </div>
+
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input
+                    type="text"
+                    id="cityInput"
+                    autocomplete="off"
+                    placeholder="Search a city, landmark, or neighbourhood">
+
+                <button id="searchBtn" class="action-btn" aria-label="Search">
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+
+                <button id="locationBtn" class="action-btn location-action" aria-label="Use my current location">
+                    <i class="fa-solid fa-location-crosshairs"></i>
+                </button>
+                <div id="suggestions" class="suggestions" role="listbox"></div>
+            </div>
+
+            <button class="top-settings-btn" id="topSettingsBtn" aria-label="Open quick settings">
+                <i class="fa-solid fa-sliders"></i>
+            </button>
+        </header>
+
+        <section id="alertPanel" class="alert-panel hide" aria-live="polite">
+            <div class="alert-header">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <strong>Weather alerts</strong>
+            </div>
+            <div id="alertList" class="alert-list"></div>
+        </section>
+
+        <main class="dash-grid" id="dashboardSection">
+
+            <section class="weather-card" id="weatherCardSection">
+                <div class="weather-card-head">
+                    <span class="brand-mini"><i class="fa-solid fa-cloud-bolt"></i> Weathry</span>
+                    <span class="wc-search" id="wcSearchBtn" role="button" tabindex="0" aria-label="Focus search"><i class="fa-solid fa-magnifying-glass"></i></span>
+                </div>
+
+                <div class="weather-orb-wrap">
+                    <div class="weather-orb" id="weatherOrb">
+                        <img id="weatherIcon" alt="">
+                    </div>
+                </div>
+
+                <h1 id="temp" class="temp-display">--°</h1>
+                <h2 id="condition" class="condition-display">Loading conditions&hellip;</h2>
+
+                <div class="wc-foot">
+                    <p class="wc-location"><i class="fa-solid fa-location-dot"></i> <span id="locationLine">Tracking the nearest city</span></p>
+                    <p class="wc-date"><i class="fa-solid fa-calendar"></i> <span id="date">&nbsp;</span></p>
+                </div>
+
+                <div class="brand-title-row hide-visually">
+                    <h1 id="cityName">Finding you&hellip;</h1>
+                    <span class="premium-badge">Premium</span>
+                </div>
+            </section>
+
+            <section class="highlights-panel">
+                <div class="panel-head">
+                    <h2>Today&rsquo;s Highlight</h2>
+                </div>
+
+                <div class="highlights-grid">
+
+                    <div class="hl-card wind-card">
+                        <h4>Wind Status</h4>
+                        <svg class="wind-spark" viewBox="0 0 220 70" preserveAspectRatio="none" aria-hidden="true">
+                            <path d="M0,46 C18,40 28,52 42,44 C58,34 66,50 82,40 C100,28 112,54 130,36 C148,20 160,44 178,30 C194,18 206,32 220,20"
+                                fill="none" stroke="url(#windGrad)" stroke-width="3" stroke-linecap="round"/>
+                            <defs>
+                                <linearGradient id="windGrad" x1="0" y1="0" x2="1" y2="0">
+                                    <stop offset="0%" stop-color="var(--accent-cyan)"/>
+                                    <stop offset="100%" stop-color="var(--accent-blue)"/>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        <div class="hl-bars" aria-hidden="true">
+                            <span style="--h:30%"></span><span style="--h:45%"></span><span style="--h:38%"></span>
+                            <span style="--h:60%"></span><span style="--h:50%"></span><span style="--h:80%"></span>
+                            <span style="--h:65%"></span><span style="--h:42%"></span><span style="--h:55%"></span>
+                        </div>
+                        <div class="hl-value-row">
+                            <h2 id="wind">-- km/h</h2>
+                        </div>
+                    </div>
+
+                    <div class="hl-card uv-card">
+                        <h4>UV Index</h4>
+                        <svg class="uv-gauge" viewBox="0 0 160 92" aria-hidden="true">
+                            <path d="M12,84 A68,68 0 0 1 148,84" fill="none" stroke="var(--surface-3)" stroke-width="12" stroke-linecap="round"/>
+                            <path id="uvArc" d="M12,84 A68,68 0 0 1 148,84" fill="none" stroke="url(#uvGrad)" stroke-width="12" stroke-linecap="round"
+                                stroke-dasharray="214" stroke-dashoffset="107"/>
+                            <defs>
+                                <linearGradient id="uvGrad" x1="0" y1="0" x2="1" y2="0">
+                                    <stop offset="0%" stop-color="var(--accent-cyan)"/>
+                                    <stop offset="100%" stop-color="var(--accent-blue)"/>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        <div class="hl-value-row centered">
+                            <h2 id="uvIndex">--</h2>
+                            <span class="hl-sub">uv</span>
+                        </div>
+                    </div>
+
+                    <div class="hl-card sun-card">
+                        <h4>Sunrise &amp; Sunset</h4>
+                        <svg class="sun-arc" viewBox="0 0 200 84" aria-hidden="true">
+                            <path d="M10,74 Q100,-10 190,74" fill="none" stroke="var(--surface-3)" stroke-width="2" stroke-dasharray="4 6"/>
+                            <circle id="dayPhaseDot" cx="100" cy="24" r="7" fill="var(--accent-amber)"/>
+                        </svg>
+                        <div class="sun-times">
+                            <div><i class="fa-solid fa-arrow-up-long"></i><span id="sunrise">--:--</span></div>
+                            <div><i class="fa-solid fa-arrow-down-long"></i><span id="sunset">--:--</span></div>
+                        </div>
+                    </div>
+
+                    <div class="hl-card">
+                        <h4>Humidity</h4>
+                        <div class="hl-icon"><i class="fa-solid fa-droplet"></i></div>
+                        <div class="hl-value-row">
+                            <h2 id="humidity">--%</h2>
+                        </div>
+                    </div>
+
+                    <div class="hl-card">
+                        <h4>Visibility</h4>
+                        <div class="hl-icon"><i class="fa-solid fa-eye"></i></div>
+                        <div class="hl-value-row">
+                            <h2 id="visibility">-- km</h2>
+                        </div>
+                    </div>
+
+                    <div class="hl-card">
+                        <h4>Feels Like</h4>
+                        <div class="hl-icon"><i class="fa-solid fa-temperature-half"></i></div>
+                        <div class="hl-value-row">
+                            <h2 id="feelsLike">--°</h2>
+                        </div>
+                    </div>
+
+                    <div class="hl-card small-card">
+                        <h4>AQI</h4>
+                        <div class="hl-icon"><i class="fa-solid fa-wind"></i></div>
+                        <div class="hl-value-row">
+                            <h2 id="aqi">--</h2>
+                            <span class="hl-sub" id="aqiLabel">--</span>
+                        </div>
+                    </div>
+
+                    <div class="hl-card small-card">
+                        <h4>Day Phase</h4>
+                        <div class="hl-icon"><i class="fa-solid fa-circle-half-stroke"></i></div>
+                        <div class="hl-value-row">
+                            <h2 id="dayPhase">--</h2>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <section class="forecast" id="forecastSection">
+                <div class="forecast-head">
+                    <h2>7 days Forecast</h2>
+                    <span class="eyebrow">Tap a day for hourly detail</span>
+                </div>
+                <div class="forecast-container"></div>
+            </section>
+
+            <section class="map-panel" id="mapSection">
+                <div class="forecast-head">
+                    <h2>Weather condition map</h2>
+                    <span class="eyebrow">24 hr</span>
+                </div>
+                <div class="map-card" id="mapPreview" aria-label="Location preview">
+                    <div class="map-scene">
+                        <div id="leafletMap" class="leaflet-map"></div>
+
+                        <div class="map-precip-legend">
+                            <span class="legend-title">Precipitation</span>
+                            <div class="legend-bar"></div>
+                            <div class="legend-labels">
+                                <span>Extreme</span><span>Heavy</span><span>Moderate</span><span>Light</span>
+                            </div>
+                        </div>
+
+                        <div class="map-controls">
+                            <button type="button" class="map-ctrl-btn" id="mapZoomInBtn" aria-label="Zoom in"><i class="fa-solid fa-plus"></i></button>
+                            <button type="button" class="map-ctrl-btn" id="mapZoomOutBtn" aria-label="Zoom out"><i class="fa-solid fa-minus"></i></button>
+                            <button type="button" class="map-ctrl-btn" id="mapLocateBtn" aria-label="Use my location"><i class="fa-solid fa-location-crosshairs"></i></button>
+                            <button type="button" class="map-ctrl-btn" id="mapListBtn" aria-label="Jump to saved places"><i class="fa-solid fa-list"></i></button>
+                            <button type="button" class="map-ctrl-btn" id="mapLayersBtn" aria-label="Switch map layer"><i class="fa-solid fa-layer-group"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chip-row">
+                    <div class="chip-group">
+                        <span class="chip-label">Favorites</span>
+                        <div id="favoritesList" class="chip-list"></div>
+                    </div>
+                    <div class="chip-group">
+                        <span class="chip-label">Recent</span>
+                        <div id="recentList" class="chip-list"></div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <section class="hourly-section" id="hourlySection">
+            <div class="forecast-head hourly-head">
+                <h2 id="hourlyTitle">Today's hours</h2>
+                <span class="eyebrow" id="hourlySubtitle">Hourly outlook</span>
+            </div>
+            <div id="hourlyContainer" class="hourly-container"></div>
+        </section>
+
+        <footer class="foot-note">Build By Vishvas &middot; built for people who check the sky obsessively</footer>
+
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
